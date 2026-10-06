@@ -239,13 +239,16 @@ class Playback:
         self.motion_elapsed = 0.0
 
 
-def draw_frame(image, frame):
+def draw_frame(image, frame, playback=None):
     bottom = image.h - frame.top - frame.height
     anchor_y = frame.height / 2 if frame.anchor_y is None else frame.anchor_y
-    y = CANVAS_HEIGHT / 2 + (frame.height / 2 - anchor_y) * SCALE
-    image.clip_draw(frame.left, bottom, frame.width, frame.height,
-                    CANVAS_WIDTH / 2, y,
-                    frame.width * SCALE, frame.height * SCALE)
+    x = playback.x if playback is not None else CANVAS_WIDTH / 2
+    base_y = playback.y if playback is not None else CANVAS_HEIGHT / 2
+    y = base_y + (frame.height / 2 - anchor_y) * SCALE
+    flip = 'h' if playback is not None and playback.direction == -1 else ''
+    image.clip_composite_draw(frame.left, bottom, frame.width, frame.height,
+                              0, flip, x, y,
+                              frame.width * SCALE, frame.height * SCALE)
 
 
 def validate_frames(image):
@@ -253,6 +256,9 @@ def validate_frames(image):
     if len(ANIMATIONS) != len(ROW_FRAME_COUNTS):
         raise ValueError('동작 개수가 원본과 다릅니다.')
     for index, animation in enumerate(ANIMATIONS):
+        if (not isfinite(animation.speed) or animation.speed < 0
+                or not isfinite(animation.jump_height) or animation.jump_height < 0):
+            raise ValueError(f'{animation.name}: 이동 설정은 유한한 0 이상의 값이어야 합니다.')
         if len(animation.frames) != ROW_FRAME_COUNTS[index]:
             raise ValueError(f'{animation.name}: 프레임 개수가 원본과 다릅니다.')
         for frame in animation.frames:
@@ -263,8 +269,10 @@ def validate_frames(image):
                 raise ValueError(f'{animation.name}: 이미지 밖의 프레임 {frame}')
             y = CANVAS_HEIGHT / 2 + (frame.height / 2 - frame.anchor_y) * SCALE
             if (frame.width * SCALE > CANVAS_WIDTH
+                    or (animation.speed > 0
+                        and frame.width * SCALE + 2 * EDGE_MARGIN >= CANVAS_WIDTH)
                     or y - frame.height * SCALE / 2 < 0
-                    or y + frame.height * SCALE / 2 > CANVAS_HEIGHT):
+                    or y + animation.jump_height + frame.height * SCALE / 2 > CANVAS_HEIGHT):
                 raise ValueError(f'{animation.name}: 확대 프레임이 화면 밖입니다.')
 
 
@@ -285,7 +293,7 @@ def run_viewer(image):
         previous = now
         # pico2d의 기본 단색 배경(200, 200, 210)은 소닉과 대비된다.
         pico2d.clear_canvas()
-        draw_frame(image, playback.frame)
+        draw_frame(image, playback.frame, playback)
         pico2d.update_canvas()
         pico2d.delay(0.01)
 
