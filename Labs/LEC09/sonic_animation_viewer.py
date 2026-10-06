@@ -2,10 +2,29 @@
 
 import pico2d
 from pathlib import Path
+from typing import NamedTuple
 
 CANVAS_WIDTH = 1200
 CANVAS_HEIGHT = 800
 IMAGE_PATH = Path(__file__).resolve().with_name('sonic-sprite.png')
+
+# 원본 시트의 위쪽부터 순서대로: 총 10개 동작, 76개 프레임.
+ROW_FRAME_COUNTS = (11, 12, 6, 9, 6, 6, 6, 8, 8, 4)
+
+
+class Frame(NamedTuple):
+    left: int
+    top: int
+    width: int
+    height: int
+
+
+class Animation(NamedTuple):
+    name: str
+    frames: tuple
+
+
+ANIMATIONS = ()
 
 
 def main():
