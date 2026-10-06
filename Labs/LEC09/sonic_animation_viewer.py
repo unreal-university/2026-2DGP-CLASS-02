@@ -13,6 +13,8 @@ def main():
         for event in pico2d.get_events():
             if event.type == pico2d.SDL_QUIT:
                 running = False
+            elif event.type == pico2d.SDL_KEYDOWN and event.key == pico2d.SDLK_ESCAPE:
+                running = False
         pico2d.clear_canvas()
         pico2d.update_canvas()
         pico2d.delay(0.01)
