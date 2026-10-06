@@ -13,6 +13,7 @@ FRAMES_PER_SECOND = 10
 FRAME_SECONDS = 1 / FRAMES_PER_SECOND
 REPEAT_COUNT = 5
 WAIT_SECONDS = 1.0
+EDGE_MARGIN = 32
 IMAGE_PATH = Path(__file__).resolve().with_name('sonic-sprite.png')
 
 # 원본 시트의 위쪽부터 순서대로: 총 10개 동작, 76개 프레임.
@@ -30,6 +31,8 @@ class Frame(NamedTuple):
 class Animation(NamedTuple):
     name: str
     frames: tuple
+    speed: float = 0.0
+    jump_height: float = 0.0
 
 
 ANIMATIONS = (
@@ -138,15 +141,47 @@ ANIMATIONS = tuple(
     for index, animation in enumerate(ANIMATIONS)
 )
 
+# 속도는 화면 픽셀/초, 점프 높이는 화면 픽셀 단위이다.
+MOTION_PROFILES = (
+    ('걷기', 120, 0), ('달리기', 220, 0), ('빠른 달리기', 320, 0),
+    ('회전 진입', 0, 0), ('회전 점프', 180, 150),
+    ('회전 달리기', 280, 0), ('빠른 회전 달리기', 340, 0),
+    ('공중 회전', 200, 180), ('옆으로 걷기', 140, 0), ('포즈', 0, 0),
+)
+ANIMATIONS = tuple(
+    animation._replace(name=name, speed=speed, jump_height=height)
+    for animation, (name, speed, height) in zip(ANIMATIONS, MOTION_PROFILES)
+)
+
 
 class Playback:
     def __init__(self):
-        self.animation_index = 0
-        self.frame_index = 0
-        self.frame_elapsed = 0.0
-        self.completed = 0
-        self.state = 'PLAYING'
-        self.wait_elapsed = 0.0
+        self.start_animation(0)
+
+    @property
+    def animation(self):
+        return ANIMATIONS[self.animation_index]
+
+    @property
+    def y(self):
+        cycle_time = len(self.animation.frames) * FRAME_SECONDS
+        phase = (self.motion_elapsed % cycle_time) / cycle_time
+        return CANVAS_HEIGHT / 2 + 4 * self.animation.jump_height * phase * (1 - phase)
+
+    def advance_motion(self, delta):
+        if self.animation.speed == 0:
+            return
+        self.motion_elapsed += delta
+        span = self.right - self.left
+        # 왕복 경로를 접어 큰 시간 갱신에도 화면 경계 안에서 이동한다.
+        phase = self.x - self.left if self.direction == 1 else 2 * span - (self.x - self.left)
+        phase = (phase + self.animation.speed * delta) % (2 * span)
+        if phase < span:
+            self.x = self.left + phase
+            self.direction = 1
+        else:
+            self.x = self.left + 2 * span - phase
+            self.direction = -1
 
     @property
     def frame(self):
@@ -172,8 +207,10 @@ class Playback:
                 continue
             needed = FRAME_SECONDS - self.frame_elapsed
             if remaining + 1e-9 < needed:
+                self.advance_motion(remaining)
                 self.frame_elapsed += remaining
                 return
+            self.advance_motion(needed)
             remaining = max(0.0, remaining - needed)
             self.frame_elapsed = 0.0
             frames = ANIMATIONS[self.animation_index].frames
@@ -194,6 +231,12 @@ class Playback:
         self.frame_elapsed = 0.0
         self.wait_elapsed = 0.0
         self.state = 'PLAYING'
+        half_width = max(frame.width for frame in self.animation.frames) * SCALE / 2
+        self.left = EDGE_MARGIN + half_width
+        self.right = CANVAS_WIDTH - EDGE_MARGIN - half_width
+        self.x = self.left if self.animation.speed else CANVAS_WIDTH / 2
+        self.direction = 1
+        self.motion_elapsed = 0.0
 
 
 def draw_frame(image, frame):
