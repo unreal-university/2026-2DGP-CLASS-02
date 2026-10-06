@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 CANVAS_WIDTH = 1200
 CANVAS_HEIGHT = 800
+SCALE = 4
 IMAGE_PATH = Path(__file__).resolve().with_name('sonic-sprite.png')
 
 # 원본 시트의 위쪽부터 순서대로: 총 10개 동작, 76개 프레임.
@@ -32,7 +33,8 @@ ANIMATIONS = (
 def draw_frame(image, frame):
     bottom = image.h - frame.top - frame.height
     image.clip_draw(frame.left, bottom, frame.width, frame.height,
-                    CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
+                    CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+                    frame.width * SCALE, frame.height * SCALE)
 
 
 def main():
@@ -52,6 +54,7 @@ def main():
                 running = False
             elif event.type == pico2d.SDL_KEYDOWN and event.key == pico2d.SDLK_ESCAPE:
                 running = False
+        # pico2d의 기본 단색 배경(200, 200, 210)은 소닉과 대비된다.
         pico2d.clear_canvas()
         draw_frame(image, ANIMATIONS[0].frames[0])
         pico2d.update_canvas()
