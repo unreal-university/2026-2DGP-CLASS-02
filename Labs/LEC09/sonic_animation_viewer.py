@@ -141,6 +141,7 @@ class Playback:
         self.animation_index = 0
         self.frame_index = 0
         self.frame_elapsed = 0.0
+        self.completed = 0
 
     @property
     def frame(self):
@@ -151,7 +152,10 @@ class Playback:
         frames = ANIMATIONS[self.animation_index].frames
         while self.frame_elapsed >= FRAME_SECONDS:
             self.frame_elapsed -= FRAME_SECONDS
-            self.frame_index = (self.frame_index + 1) % len(frames)
+            self.frame_index += 1
+            if self.frame_index == len(frames):
+                self.completed += 1
+                self.frame_index = 0
 
 
 def draw_frame(image, frame):
