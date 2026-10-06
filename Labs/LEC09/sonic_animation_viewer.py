@@ -158,9 +158,9 @@ class Playback:
     def update(self, delta):
         if self.state == 'WAITING':
             self.wait_elapsed += delta
-            if self.wait_complete and self.animation_index + 1 < len(ANIMATIONS):
+            if self.wait_complete:
                 leftover = self.wait_elapsed - WAIT_SECONDS
-                self.start_animation(self.animation_index + 1)
+                self.start_animation((self.animation_index + 1) % len(ANIMATIONS))
                 self.update(leftover)
             return
         self.frame_elapsed += delta
