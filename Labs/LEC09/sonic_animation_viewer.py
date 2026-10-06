@@ -158,6 +158,10 @@ class Playback:
     def update(self, delta):
         if self.state == 'WAITING':
             self.wait_elapsed += delta
+            if self.wait_complete and self.animation_index + 1 < len(ANIMATIONS):
+                leftover = self.wait_elapsed - WAIT_SECONDS
+                self.start_animation(self.animation_index + 1)
+                self.update(leftover)
             return
         self.frame_elapsed += delta
         frames = ANIMATIONS[self.animation_index].frames
@@ -173,6 +177,14 @@ class Playback:
                     self.frame_elapsed = 0.0
                     break
                 self.frame_index = 0
+
+    def start_animation(self, index):
+        self.animation_index = index
+        self.frame_index = 0
+        self.completed = 0
+        self.frame_elapsed = 0.0
+        self.wait_elapsed = 0.0
+        self.state = 'PLAYING'
 
 
 def draw_frame(image, frame):
