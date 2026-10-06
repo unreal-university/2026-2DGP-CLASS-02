@@ -143,14 +143,15 @@ class Playback:
         self.frame_index = 0
         self.frame_elapsed = 0.0
         self.completed = 0
-        self.finished = False
+        self.state = 'PLAYING'
+        self.wait_elapsed = 0.0
 
     @property
     def frame(self):
         return ANIMATIONS[self.animation_index].frames[self.frame_index]
 
     def update(self, delta):
-        if self.finished:
+        if self.state == 'WAITING':
             return
         self.frame_elapsed += delta
         frames = ANIMATIONS[self.animation_index].frames
@@ -161,7 +162,9 @@ class Playback:
                 self.completed += 1
                 if self.completed == REPEAT_COUNT:
                     self.frame_index = len(frames) - 1
-                    self.finished = True
+                    self.state = 'WAITING'
+                    self.wait_elapsed = self.frame_elapsed
+                    self.frame_elapsed = 0.0
                     break
                 self.frame_index = 0
 
