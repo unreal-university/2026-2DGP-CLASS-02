@@ -39,6 +39,7 @@ def draw_frame(image, frame):
 
 def main():
     pico2d.open_canvas(CANVAS_WIDTH, CANVAS_HEIGHT)
+    pico2d.hide_lattice()
     try:
         if not IMAGE_PATH.is_file():
             raise FileNotFoundError('스프라이트 이미지 파일이 없습니다.')
