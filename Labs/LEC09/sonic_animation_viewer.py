@@ -4,6 +4,7 @@ import pico2d
 from pathlib import Path
 from typing import NamedTuple
 from time import perf_counter
+from math import isfinite
 
 CANVAS_WIDTH = 1200
 CANVAS_HEIGHT = 800
@@ -153,30 +154,38 @@ class Playback:
 
     @property
     def wait_complete(self):
-        return self.state == 'WAITING' and self.wait_elapsed >= WAIT_SECONDS
+        return self.state == 'WAITING' and self.wait_elapsed + 1e-9 >= WAIT_SECONDS
 
     def update(self, delta):
-        if self.state == 'WAITING':
-            self.wait_elapsed += delta
-            if self.wait_complete:
-                leftover = self.wait_elapsed - WAIT_SECONDS
+        """남은 시간을 보존하며 프레임·정지·동작 경계를 모두 처리한다."""
+        if not isfinite(delta) or delta < 0:
+            raise ValueError('경과 시간은 유한한 0 이상의 값이어야 합니다.')
+        remaining = delta
+        while True:
+            if self.state == 'WAITING':
+                needed = WAIT_SECONDS - self.wait_elapsed
+                if remaining + 1e-9 < needed:
+                    self.wait_elapsed += remaining
+                    return
+                remaining = max(0.0, remaining - needed)
                 self.start_animation((self.animation_index + 1) % len(ANIMATIONS))
-                self.update(leftover)
-            return
-        self.frame_elapsed += delta
-        frames = ANIMATIONS[self.animation_index].frames
-        while self.frame_elapsed >= FRAME_SECONDS:
-            self.frame_elapsed -= FRAME_SECONDS
+                continue
+            needed = FRAME_SECONDS - self.frame_elapsed
+            if remaining + 1e-9 < needed:
+                self.frame_elapsed += remaining
+                return
+            remaining = max(0.0, remaining - needed)
+            self.frame_elapsed = 0.0
+            frames = ANIMATIONS[self.animation_index].frames
             self.frame_index += 1
             if self.frame_index == len(frames):
                 self.completed += 1
                 if self.completed == REPEAT_COUNT:
                     self.frame_index = len(frames) - 1
                     self.state = 'WAITING'
-                    self.wait_elapsed = self.frame_elapsed
-                    self.frame_elapsed = 0.0
-                    break
-                self.frame_index = 0
+                    self.wait_elapsed = 0.0
+                else:
+                    self.frame_index = 0
 
     def start_animation(self, index):
         self.animation_index = index
@@ -196,17 +205,27 @@ def draw_frame(image, frame):
                     frame.width * SCALE, frame.height * SCALE)
 
 
-def main():
-    pico2d.open_canvas(CANVAS_WIDTH, CANVAS_HEIGHT)
-    pico2d.hide_lattice()
-    try:
-        if not IMAGE_PATH.is_file():
-            raise FileNotFoundError('스프라이트 이미지 파일이 없습니다.')
-        image = pico2d.load_image(str(IMAGE_PATH))
-    except Exception as error:
-        print(f'이미지 로드 실패: {IMAGE_PATH}\n원인: {error}')
-        pico2d.close_canvas()
-        return 1
+def validate_frames(image):
+    """잘못된 데이터로 화면 밖이나 다른 영역을 그리는 일을 막는다."""
+    if len(ANIMATIONS) != len(ROW_FRAME_COUNTS):
+        raise ValueError('동작 개수가 원본과 다릅니다.')
+    for index, animation in enumerate(ANIMATIONS):
+        if len(animation.frames) != ROW_FRAME_COUNTS[index]:
+            raise ValueError(f'{animation.name}: 프레임 개수가 원본과 다릅니다.')
+        for frame in animation.frames:
+            if (not all(isinstance(v, int) for v in frame[:4])
+                    or frame.width <= 0 or frame.height <= 0
+                    or not 0 <= frame.left < frame.left + frame.width <= image.w
+                    or not 0 <= frame.top < frame.top + frame.height <= image.h):
+                raise ValueError(f'{animation.name}: 이미지 밖의 프레임 {frame}')
+            y = CANVAS_HEIGHT / 2 + (frame.height / 2 - frame.anchor_y) * SCALE
+            if (frame.width * SCALE > CANVAS_WIDTH
+                    or y - frame.height * SCALE / 2 < 0
+                    or y + frame.height * SCALE / 2 > CANVAS_HEIGHT):
+                raise ValueError(f'{animation.name}: 확대 프레임이 화면 밖입니다.')
+
+
+def run_viewer(image):
     running = True
     playback = Playback()
     previous = perf_counter()
@@ -216,6 +235,8 @@ def main():
                 running = False
             elif event.type == pico2d.SDL_KEYDOWN and event.key == pico2d.SDLK_ESCAPE:
                 running = False
+        if not running:
+            break
         now = perf_counter()
         playback.update(now - previous)
         previous = now
@@ -224,8 +245,35 @@ def main():
         draw_frame(image, playback.frame)
         pico2d.update_canvas()
         pico2d.delay(0.01)
-    pico2d.close_canvas()
+
+
+def main():
+    canvas_open = False
+    try:
+        if not isfinite(FRAME_SECONDS) or FRAME_SECONDS <= 0:
+            raise ValueError('프레임 시간은 유한한 양수여야 합니다.')
+        pico2d.open_canvas(CANVAS_WIDTH, CANVAS_HEIGHT)
+        canvas_open = True
+        pico2d.hide_lattice()
+        try:
+            if not IMAGE_PATH.is_file():
+                raise FileNotFoundError('스프라이트 이미지 파일이 없습니다.')
+            image = pico2d.load_image(str(IMAGE_PATH))
+            if image.w <= 0 or image.h <= 0:
+                raise ValueError('이미지를 해석할 수 없습니다.')
+        except Exception as error:
+            print(f'이미지 로드 실패: {IMAGE_PATH}\n원인: {error}')
+            return 1
+        validate_frames(image)
+        run_viewer(image)
+        return 0
+    except Exception as error:
+        print(f'뷰어 실행 오류: {error}')
+        return 1
+    finally:
+        if canvas_open:
+            pico2d.close_canvas()
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
