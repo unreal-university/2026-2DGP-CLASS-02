@@ -21,6 +21,7 @@ class Frame(NamedTuple):
     top: int
     width: int
     height: int
+    anchor_y: float = None
 
 
 class Animation(NamedTuple):
@@ -123,6 +124,18 @@ ANIMATIONS = (
 )
 
 
+# 잘라낸 사각형의 중심 대신 원본 행의 중심을 기준으로 높이를 맞춘다.
+# 이를 통해 자세 변화는 보존하고 프레임 크기 차이로 생기는 흔들림을 줄인다.
+ROW_CENTERS = (58.5, 98.5, 142.5, 183.5, 219.5, 256, 300.5, 348.5, 397, 447.5)
+ANIMATIONS = tuple(
+    Animation(animation.name, tuple(
+        frame._replace(anchor_y=frame.top + frame.height - ROW_CENTERS[index])
+        for frame in animation.frames
+    ))
+    for index, animation in enumerate(ANIMATIONS)
+)
+
+
 class Playback:
     def __init__(self):
         self.animation_index = 0
@@ -143,8 +156,10 @@ class Playback:
 
 def draw_frame(image, frame):
     bottom = image.h - frame.top - frame.height
+    anchor_y = frame.height / 2 if frame.anchor_y is None else frame.anchor_y
+    y = CANVAS_HEIGHT / 2 + (frame.height / 2 - anchor_y) * SCALE
     image.clip_draw(frame.left, bottom, frame.width, frame.height,
-                    CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2,
+                    CANVAS_WIDTH / 2, y,
                     frame.width * SCALE, frame.height * SCALE)
 
 
