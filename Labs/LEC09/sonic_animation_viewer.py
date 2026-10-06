@@ -24,7 +24,15 @@ class Animation(NamedTuple):
     frames: tuple
 
 
-ANIMATIONS = ()
+ANIMATIONS = (
+    Animation('동작 01', (Frame(1, 39, 29, 39),)),
+)
+
+
+def draw_frame(image, frame):
+    bottom = image.h - frame.top - frame.height
+    image.clip_draw(frame.left, bottom, frame.width, frame.height,
+                    CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2)
 
 
 def main():
@@ -45,6 +53,7 @@ def main():
             elif event.type == pico2d.SDL_KEYDOWN and event.key == pico2d.SDLK_ESCAPE:
                 running = False
         pico2d.clear_canvas()
+        draw_frame(image, ANIMATIONS[0].frames[0])
         pico2d.update_canvas()
         pico2d.delay(0.01)
     pico2d.close_canvas()
