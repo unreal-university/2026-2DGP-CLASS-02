@@ -11,6 +11,7 @@ SCALE = 4
 FRAMES_PER_SECOND = 10
 FRAME_SECONDS = 1 / FRAMES_PER_SECOND
 REPEAT_COUNT = 5
+WAIT_SECONDS = 1.0
 IMAGE_PATH = Path(__file__).resolve().with_name('sonic-sprite.png')
 
 # 원본 시트의 위쪽부터 순서대로: 총 10개 동작, 76개 프레임.
@@ -150,8 +151,13 @@ class Playback:
     def frame(self):
         return ANIMATIONS[self.animation_index].frames[self.frame_index]
 
+    @property
+    def wait_complete(self):
+        return self.state == 'WAITING' and self.wait_elapsed >= WAIT_SECONDS
+
     def update(self, delta):
         if self.state == 'WAITING':
+            self.wait_elapsed += delta
             return
         self.frame_elapsed += delta
         frames = ANIMATIONS[self.animation_index].frames
