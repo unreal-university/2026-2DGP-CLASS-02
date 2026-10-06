@@ -10,6 +10,7 @@ CANVAS_HEIGHT = 800
 SCALE = 4
 FRAMES_PER_SECOND = 10
 FRAME_SECONDS = 1 / FRAMES_PER_SECOND
+REPEAT_COUNT = 5
 IMAGE_PATH = Path(__file__).resolve().with_name('sonic-sprite.png')
 
 # 원본 시트의 위쪽부터 순서대로: 총 10개 동작, 76개 프레임.
@@ -142,12 +143,15 @@ class Playback:
         self.frame_index = 0
         self.frame_elapsed = 0.0
         self.completed = 0
+        self.finished = False
 
     @property
     def frame(self):
         return ANIMATIONS[self.animation_index].frames[self.frame_index]
 
     def update(self, delta):
+        if self.finished:
+            return
         self.frame_elapsed += delta
         frames = ANIMATIONS[self.animation_index].frames
         while self.frame_elapsed >= FRAME_SECONDS:
@@ -155,6 +159,10 @@ class Playback:
             self.frame_index += 1
             if self.frame_index == len(frames):
                 self.completed += 1
+                if self.completed == REPEAT_COUNT:
+                    self.frame_index = len(frames) - 1
+                    self.finished = True
+                    break
                 self.frame_index = 0
 
 
